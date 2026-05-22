@@ -109,7 +109,16 @@ export class Registry {
                             if (cacheTextData.trim().length == 0) {
                                 registry = [];
                             } else {
-                                registry = JSON.parse(cacheTextData);
+                                try {
+                                    registry = JSON.parse(cacheTextData);
+                                } catch (e) {
+                                    console.error('Clipboard Indicator: cache file contains malformed JSON, starting with empty history');
+                                    console.error(e);
+                                    let destination = Gio.file_new_for_path(this.BACKUP_REGISTRY_PATH);
+                                    file.move(destination, FileCopyFlags.OVERWRITE, null, null);
+                                    resolve([]);
+                                    return;
+                                }
                             }
                             const entriesPromises = registry.map(
                                 jsonEntry => {

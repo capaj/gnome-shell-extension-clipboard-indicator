@@ -97,3 +97,21 @@
     padding: 8px;
     min-width: 384px;
 }
+
+.ci-tooltip {
+    background-color: #36363a;
+    color: #ffffff;
+    border: 1px solid #424247;
+    border-radius: 12px;
+    padding: 8px 12px;
+    box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.35);
+}
+
+.ci-tooltip-text {
+    color: #f0f0f0;
+    font-size: 13px;
+    font-weight: normal;
+}
+
+
+

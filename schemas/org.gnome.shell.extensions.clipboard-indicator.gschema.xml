@@ -297,5 +297,12 @@
         <default>true</default>
         <summary>Show the preview button on each image item</summary>
     </key>
+    <key name="show-tooltip" type="b">
+        <default>false</default>
+        <summary>Hover Preview</summary>
+        <description>
+            If true, hovering over clipboard entries will show a floating tooltip with full text or image preview
+        </description>
+    </key>
     </schema>
 </schemalist>

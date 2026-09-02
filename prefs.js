@@ -203,6 +203,11 @@ class Settings {
             subtitle: _("Show the preview button on each image item")
         });
 
+        this.field_show_tooltip = new Adw.SwitchRow({
+            title: _("Hover Preview"),
+            subtitle: _("Show a floating tooltip with full text or image preview on hover")
+        });
+
         this.field_cache_images = new Adw.SwitchRow({
             title: _("Cache images"),
             subtitle: _("Save copied images to clipboard history"),
@@ -276,6 +281,7 @@ class Settings {
         this.ui.add(this.field_show_private_mode);
         this.ui.add(this.field_show_settings_button);
         this.ui.add(this.field_show_clear_history_button);
+        this.ui.add(this.field_show_tooltip);
 
         this.behavior.add(this.field_strip_text);
         this.behavior.add(this.field_move_item_first);
@@ -351,6 +357,7 @@ class Settings {
         this.schema.bind(PrefsFields.SHOW_PIN_BUTTON, this.field_show_pin_button, 'active', Gio.SettingsBindFlags.DEFAULT);
         this.schema.bind(PrefsFields.SHOW_EDIT_BUTTON, this.field_show_edit_button, 'active', Gio.SettingsBindFlags.DEFAULT);
         this.schema.bind(PrefsFields.SHOW_PREVIEW_BUTTON, this.field_show_preview_button, 'active', Gio.SettingsBindFlags.DEFAULT);
+        this.schema.bind(PrefsFields.SHOW_TOOLTIP, this.field_show_tooltip, 'active', Gio.SettingsBindFlags.DEFAULT);
 
         this.field_clear_history_interval.set_sensitive(this.field_clear_history_on_interval.active);
         this.#fetchExludedAppsList();

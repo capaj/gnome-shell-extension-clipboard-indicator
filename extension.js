@@ -1,7 +1,10 @@
 import Clutter from 'gi://Clutter';
 import Cogl from 'gi://Cogl';
+import GdkPixbuf from 'gi://GdkPixbuf';
+import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Meta from 'gi://Meta';
+import Pango from 'gi://Pango';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
 
@@ -62,6 +65,7 @@ let SHOW_TAG_BUTTON           = true;
 let SHOW_PIN_BUTTON           = true;
 let SHOW_EDIT_BUTTON          = true;
 let SHOW_PREVIEW_BUTTON       = true;
+let SHOW_TOOLTIP              = false;
 
 export default class ClipboardIndicatorExtension extends Extension {
     enable () {
@@ -96,6 +100,7 @@ const ClipboardIndicator = GObject.registerClass({
         this._clearDelayedSelectionTimeout();
         this.#clearTimeouts();
         this.#closeImagePreview();
+        this._destroyTooltip();
         this._removeHistoryLabel();
         this._destroyNotifSource();
         this.dialogManager.destroy();
@@ -162,6 +167,7 @@ const ClipboardIndicator = GObject.registerClass({
         if (CLEAR_ON_BOOT) this.registry.clearCacheFolder();
 
         this.dialogManager = new DialogManager();
+        this._initTooltip();
         this._buildMenu().then(() => {
             if (this._destroyed) {
                 return;
@@ -511,6 +517,7 @@ const ClipboardIndicator = GObject.registerClass({
     items. It the entry is empty, the section is restored with all items
     set as visible. */
     _onSearchTextChanged () {
+        this._hideTooltip();
 
         // Text to be searched converted to lowercase if search is case insensitive
         let searchedText = this.searchEntry.get_text();
@@ -680,6 +687,9 @@ const ClipboardIndicator = GObject.registerClass({
             }
             return Clutter.EVENT_PROPAGATE;
         });
+
+        // Tooltip preview on hover
+        this._addTooltipToItem(menuItem);
 
         this._setEntryLabel(menuItem);
         this.clipItemsRadioGroup.push(menuItem);
@@ -951,6 +961,7 @@ const ClipboardIndicator = GObject.registerClass({
     }
 
     _onMenuItemSelectedAndMenuClose (menuItem, autoSet) {
+        this._hideTooltip();
         for (let otherMenuItem of menuItem.radioGroup) {
             let clipContents = menuItem.clipContents;
 
@@ -1413,6 +1424,7 @@ const ClipboardIndicator = GObject.registerClass({
         SHOW_PIN_BUTTON             = settings.get_boolean(PrefsFields.SHOW_PIN_BUTTON);
         SHOW_EDIT_BUTTON            = settings.get_boolean(PrefsFields.SHOW_EDIT_BUTTON);
         SHOW_PREVIEW_BUTTON         = settings.get_boolean(PrefsFields.SHOW_PREVIEW_BUTTON);
+        SHOW_TOOLTIP                = settings.get_boolean(PrefsFields.SHOW_TOOLTIP);
     }
 
     async _onSettingsChange () {
@@ -1424,6 +1436,10 @@ const ClipboardIndicator = GObject.registerClass({
             if (!SHOW_PRIVATE_MODE && PRIVATEMODE && this.privateModeMenuItem) {
                 this.privateModeMenuItem.setToggleState(false);
                 this._onPrivateModeSwitch();
+            }
+
+            if (!SHOW_TOOLTIP) {
+                this._hideTooltip();
             }
 
             // Remove old entries in case the registry size changed
@@ -1894,6 +1910,318 @@ const ClipboardIndicator = GObject.registerClass({
 
         if (overlay.get_parent()) global.stage.remove_child(overlay);
         overlay.destroy();
+    }
+
+    _initTooltip () {
+        this._tooltipWidget = new St.BoxLayout({
+            style_class: 'ci-tooltip',
+            vertical: true,
+            visible: false,
+            reactive: false,
+            can_focus: false,
+        });
+
+        this._tooltipImageBin = new St.Bin({
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.CENTER,
+            visible: false,
+        });
+
+        this._tooltipLabel = new St.Label({
+            style_class: 'ci-tooltip-text',
+            visible: false,
+        });
+        this._tooltipLabel.clutter_text.line_wrap = true;
+        this._tooltipLabel.clutter_text.line_wrap_mode = Pango.WrapMode.WORD_CHAR;
+        this._tooltipLabel.clutter_text.ellipsize = Pango.EllipsizeMode.END;
+
+        this._tooltipWidget.add_child(this._tooltipImageBin);
+        this._tooltipWidget.add_child(this._tooltipLabel);
+
+        Main.layoutManager.uiGroup.add_child(this._tooltipWidget);
+
+        this.menu.connectObject(
+            'menu-closed', () => this._hideTooltip(),
+            'open-state-changed', (menu, open) => {
+                if (!open) this._hideTooltip();
+            },
+            this
+        );
+    }
+
+    _addTooltipToItem (menuItem) {
+        menuItem.connectObject(
+            'notify::hover', () => {
+                if (menuItem.hover) {
+                    this._onItemHover(menuItem);
+                } else {
+                    this._onItemUnhover(menuItem);
+                }
+            },
+            'destroy', () => {
+                if (this._tooltipCurrentItem === menuItem) {
+                    this._hideTooltip();
+                }
+            },
+            menuItem
+        );
+    }
+
+    _onItemHover (menuItem) {
+        if (!SHOW_TOOLTIP || this._destroyed || !this.menu.isOpen) return;
+
+        const entry = menuItem.entry;
+        if (!entry) return;
+
+        this._tooltipCurrentItem = menuItem;
+
+        if (this._tooltipShowTimeoutId) {
+            GLib.source_remove(this._tooltipShowTimeoutId);
+            this._tooltipShowTimeoutId = 0;
+        }
+
+        const delay = (this._tooltipWidget && this._tooltipWidget.visible) ? 40 : 200;
+
+        this._tooltipShowTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
+            this._tooltipShowTimeoutId = 0;
+            if (this._destroyed || !this.menu.isOpen || !menuItem.hover) {
+                return GLib.SOURCE_REMOVE;
+            }
+
+            this._showTooltip(menuItem);
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    _onItemUnhover (menuItem) {
+        if (this._tooltipCurrentItem === menuItem) {
+            if (this._tooltipShowTimeoutId) {
+                GLib.source_remove(this._tooltipShowTimeoutId);
+                this._tooltipShowTimeoutId = 0;
+            }
+            this._hideTooltip();
+        }
+    }
+
+    _showTooltip (menuItem) {
+        if (!this._tooltipWidget) return;
+
+        const entry = menuItem.entry;
+        if (!entry) return;
+
+        this._cleanupTooltipContent();
+
+        if (entry.isText()) {
+            this._showTooltipText(menuItem, entry);
+        } else if (entry.isImage()) {
+            this._showTooltipImage(menuItem, entry);
+        }
+    }
+
+    _showTooltipText (menuItem, entry) {
+        let text = entry.getStringValue();
+        if (!text) return;
+
+        text = text.trimEnd();
+
+        const MAX_TOOLTIP_CHARS = 1500;
+        if (text.length > MAX_TOOLTIP_CHARS) {
+            text = text.substring(0, MAX_TOOLTIP_CHARS) + '\n…';
+        }
+
+        this._tooltipLabel.set_text(text);
+        this._tooltipLabel.visible = true;
+        this._tooltipImageBin.visible = false;
+
+        this._tooltipWidget.visible = true;
+        Main.layoutManager.uiGroup.set_child_above_sibling(this._tooltipWidget, null);
+
+        this._tooltipWidget.set_width(-1);
+        this._tooltipLabel.set_width(-1);
+
+        const paddingX = 26;
+        const paddingY = 18;
+        const MAX_TOOLTIP_WIDTH = 450;
+        const MAX_TEXT_WIDTH = MAX_TOOLTIP_WIDTH - paddingX;
+
+        const layout = this._tooltipLabel.clutter_text.get_layout();
+        const themeNode = this._tooltipLabel.get_theme_node();
+        const fontDesc = themeNode ? themeNode.get_font() : Pango.FontDescription.from_string('Cantarell 13px');
+        if (fontDesc) {
+            layout.set_font_description(fontDesc);
+        }
+
+        layout.set_width(MAX_TEXT_WIDTH * Pango.SCALE);
+        layout.set_wrap(Pango.WrapMode.WORD_CHAR);
+
+        const lineCount = layout.get_line_count();
+        let maxLineWidth = 0;
+        for (let i = 0; i < lineCount; i++) {
+            const line = layout.get_line_readonly(i);
+            const [, logical] = line.get_pixel_extents();
+            if (logical.width > maxLineWidth) maxLineWidth = logical.width;
+        }
+
+        let tipWidth = Math.min(Math.max(maxLineWidth + paddingX, 40), MAX_TOOLTIP_WIDTH);
+
+        this._tooltipWidget.set_width(tipWidth);
+        this._tooltipLabel.set_width(tipWidth - paddingX);
+
+        let [, natHeight] = this._tooltipWidget.get_preferred_height(tipWidth);
+        let [, textH] = layout.get_pixel_size();
+        let tipHeight = Math.max(natHeight || 0, textH + paddingY, 24);
+
+        this._setTooltipCoords(menuItem, tipWidth, tipHeight);
+    }
+
+    async _showTooltipImage (menuItem, entry) {
+        try {
+            const texture = await this.registry.getEntryAsTexture(entry);
+            if (!texture || this._tooltipCurrentItem !== menuItem || this._destroyed || !this.menu.isOpen) {
+                return;
+            }
+
+            this._tooltipImageActor = texture;
+            this._tooltipImageBin.set_child(texture);
+            this._tooltipImageBin.visible = true;
+
+            const tag = entry.getTag();
+            if (tag) {
+                this._tooltipLabel.set_text(tag);
+                this._tooltipLabel.visible = true;
+            } else {
+                this._tooltipLabel.visible = false;
+            }
+
+            this._tooltipWidget.visible = true;
+            Main.layoutManager.uiGroup.set_child_above_sibling(this._tooltipWidget, null);
+
+            let origW = 0, origH = 0;
+            try {
+                const filename = this.registry.getEntryFilename(entry);
+                const [info, w, h] = GdkPixbuf.Pixbuf.get_file_info(filename);
+                if (info) {
+                    origW = w;
+                    origH = h;
+                }
+            } catch (err) {
+                // Ignore pixbuf read error
+            }
+
+            if (origW === 0 || origH === 0) {
+                const [, natW] = texture.get_preferred_width(-1);
+                const [, natH] = texture.get_preferred_height(-1);
+                origW = natW || 300;
+                origH = natH || 200;
+            }
+
+            const MAX_IMG_W = 380;
+            const MAX_IMG_H = 260;
+
+            let targetW = origW;
+            let targetH = origH;
+
+            if (targetW > MAX_IMG_W || targetH > MAX_IMG_H) {
+                const scale = Math.min(MAX_IMG_W / origW, MAX_IMG_H / origH);
+                targetW = Math.max(Math.round(origW * scale), 40);
+                targetH = Math.max(Math.round(origH * scale), 30);
+            }
+
+            texture.set_size(targetW, targetH);
+            this._tooltipImageBin.set_size(targetW, targetH);
+
+            const paddingX = 26;
+            const tipWidth = targetW + paddingX;
+            this._tooltipWidget.set_width(tipWidth);
+
+            let [, natHeight] = this._tooltipWidget.get_preferred_height(tipWidth);
+            let tipHeight = Math.max(natHeight || 0, targetH + (tag ? 36 : 18));
+
+            this._setTooltipCoords(menuItem, tipWidth, tipHeight);
+        } catch (e) {
+            console.error('[ClipboardIndicator] Failed to load tooltip image:', e);
+        }
+    }
+
+    _setTooltipCoords (menuItem, tipWidth, tipHeight) {
+        const monitor = Main.layoutManager.findMonitorForActor(menuItem) || Main.layoutManager.currentMonitor;
+
+        let [itemX, itemY] = menuItem.get_transformed_position();
+        let [itemWidth, itemHeight] = menuItem.get_transformed_size();
+
+        if (isNaN(itemX) || isNaN(itemY)) {
+            const [allocX, allocY] = menuItem.get_position();
+            itemX = isNaN(itemX) ? (allocX || 0) : itemX;
+            itemY = isNaN(itemY) ? (allocY || 0) : itemY;
+        }
+        if (isNaN(itemWidth) || itemWidth <= 0) itemWidth = menuItem.get_width() || 300;
+        if (isNaN(itemHeight) || itemHeight <= 0) itemHeight = menuItem.get_height() || 30;
+
+        const margin = 12;
+        const spaceLeft = itemX - monitor.x;
+        const spaceRight = (monitor.x + monitor.width) - (itemX + itemWidth);
+
+        let x;
+        if (spaceLeft >= tipWidth + margin) {
+            x = itemX - tipWidth - margin;
+        } else if (spaceRight >= tipWidth + margin) {
+            x = itemX + itemWidth + margin;
+        } else {
+            if (spaceLeft > spaceRight) {
+                x = Math.max(monitor.x + margin, itemX - tipWidth - margin);
+            } else {
+                x = Math.min(monitor.x + monitor.width - tipWidth - margin, itemX + itemWidth + margin);
+            }
+        }
+
+        let y = itemY;
+        const minY = monitor.y + margin;
+        const maxY = Math.max(minY, monitor.y + monitor.height - tipHeight - margin);
+        y = Math.clamp(y, minY, maxY);
+
+        x = Math.round(isNaN(x) ? monitor.x + margin : x);
+        y = Math.round(isNaN(y) ? monitor.y + margin : y);
+
+        this._tooltipWidget.set_position(x, y);
+    }
+
+    _cleanupTooltipContent () {
+        if (this._tooltipImageNotifyId && this._tooltipImageActor) {
+            this._tooltipImageActor.disconnect(this._tooltipImageNotifyId);
+            this._tooltipImageNotifyId = 0;
+        }
+        this._tooltipImageActor = null;
+        if (this._tooltipImageBin) {
+            this._tooltipImageBin.set_child(null);
+            this._tooltipImageBin.visible = false;
+        }
+        if (this._tooltipLabel) {
+            this._tooltipLabel.set_text('');
+            this._tooltipLabel.visible = false;
+        }
+    }
+
+    _hideTooltip () {
+        if (this._tooltipShowTimeoutId) {
+            GLib.source_remove(this._tooltipShowTimeoutId);
+            this._tooltipShowTimeoutId = 0;
+        }
+        this._tooltipCurrentItem = null;
+        this._cleanupTooltipContent();
+        if (this._tooltipWidget) {
+            this._tooltipWidget.visible = false;
+        }
+    }
+
+    _destroyTooltip () {
+        this._hideTooltip();
+        if (this._tooltipWidget) {
+            Main.layoutManager.uiGroup.remove_child(this._tooltipWidget);
+            this._tooltipWidget.destroy();
+            this._tooltipWidget = null;
+            this._tooltipLabel = null;
+            this._tooltipImageBin = null;
+        }
     }
 
     #clearTimeouts () {

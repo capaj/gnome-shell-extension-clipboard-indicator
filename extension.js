@@ -87,7 +87,7 @@ export default class ClipboardIndicatorExtension extends Extension {
 }
 
 const ClipboardIndicator = GObject.registerClass({
-    GTypeName: 'ClipboardIndicator'
+    GTypeName: 'CapajClipboardIndicator'
 }, class ClipboardIndicator extends PanelMenu.Button {
     #refreshInProgress = false;
     #_imagePreviewOverlay = null;

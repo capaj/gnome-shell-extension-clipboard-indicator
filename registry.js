@@ -15,7 +15,8 @@ export class Registry {
         this.uuid = uuid;
         this.settings = settings;
         this.REGISTRY_FILE = 'registry.txt';
-        this.REGISTRY_DIR = GLib.get_user_cache_dir() + '/' + this.uuid;
+        // Keep existing history and absolute image paths when replacing upstream.
+        this.REGISTRY_DIR = GLib.get_user_cache_dir() + '/clipboard-indicator@tudmotu.com';
         this.REGISTRY_PATH = this.REGISTRY_DIR + '/' + this.REGISTRY_FILE;
         this.BACKUP_REGISTRY_PATH = this.REGISTRY_PATH + '~';
     }

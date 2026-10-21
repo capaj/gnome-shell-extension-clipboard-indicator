@@ -1,5 +1,9 @@
 # 📋 Clipboard Indicator
 
+This is [capaj's fork](https://github.com/capaj/gnome-shell-extension-clipboard-indicator),
+installed as `clipboard-indicator@capaj`. It preserves the upstream settings and
+clipboard cache. Disable the upstream extension before using this fork.
+
 [<img src="https://raw.githubusercontent.com/andyholmes/gnome-shell-extensions-badge/eb9af9a1c6f04eb060cb01de6aeb5c84232cd8c0/get-it-on-ego.svg?sanitize=true" width="180" alt="Get it on GNOME Extensions">](https://extensions.gnome.org/extension/779/clipboard-indicator/)
 
 
@@ -66,13 +70,13 @@ Pasting from the menu works by sending Shift+Insert to programs or Ctrl+Shift+In
 Installation via git is performed by cloning the repo into your local gnome-shell extensions directory (usually `~/.local/share/gnome-shell/extensions/`):
 
 ```bash
-$ git clone https://github.com/Tudmotu/gnome-shell-extension-clipboard-indicator.git <extensions-dir>/clipboard-indicator@tudmotu.com
+$ git clone https://github.com/capaj/gnome-shell-extension-clipboard-indicator.git <extensions-dir>/clipboard-indicator@capaj
 ```
 
 After cloning the repo, the extension is practically installed yet disabled. In order to enable it, run the following command:
 
 ```bash
-$ gnome-extensions enable clipboard-indicator@tudmotu.com
+$ gnome-extensions enable clipboard-indicator@capaj
 ```
 
 ## ✅ GNOME Version Support

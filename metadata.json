@@ -6,10 +6,11 @@
         "49",
         "50"
     ],
-    "uuid": "clipboard-indicator@tudmotu.com",
-    "name": "Clipboard Indicator",
+    "uuid": "clipboard-indicator@capaj",
+    "name": "Clipboard Indicator (capaj fork)",
+    "version": 1,
     "description": "The most popular clipboard manager for GNOME, with over 1M downloads",
-    "url": "https://github.com/Tudmotu/gnome-shell-extension-clipboard-indicator",
+    "url": "https://github.com/capaj/gnome-shell-extension-clipboard-indicator",
     "gettext-domain": "clipboard-indicator",
     "settings-schema": "org.gnome.shell.extensions.clipboard-indicator"
 }

@@ -1,5 +1,5 @@
 MODULES = *.js locale/*/LC_MESSAGES/*.mo metadata.json stylesheet.css LICENSE.rst README.md schemas/
-INSTALLPATH=~/.local/share/gnome-shell/extensions/clipboard-indicator@tudmotu.com/
+INSTALLPATH=~/.local/share/gnome-shell/extensions/clipboard-indicator@capaj/
 
 all: compile-locales compile-settings
 

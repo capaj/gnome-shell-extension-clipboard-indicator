@@ -95,20 +95,11 @@ Clipboard Indicator versions:
 * GNOME <40
   * v37
 
-## ⌨️ Contributing
+## Why forking
 
-Contributions to this project are welcome.
+The upstream maintainer has not been responsive to major issues, including
+desktop freezes when copying. This fork exists to address those issues and
+welcome fixes and improvements from the community.
 
-Please follow these guidelines when contributing:
-
-- If you want to contribute code, your best bet is to look for an issue with the label "Up for grabs"
-- DO NOT open unsolicited PRs unless they are for updating translations
-- Look at the list of previous PRs before you open a PR, if your PR conflicts with another, it will be rejected
-- If you have a feature idea, open an issue and discuss it there before implementing. DO NOT open a PR as a platform for discussion
-
-### Release Cycle
-
-This project loosely follows the release cycle of GNOME. That means it will
-usually receive 2 updates a year, close to the release of a new major GNOME
-version. If there are features you'd like to implement or suggest, it is advised
-to start the discussion a month or two before a GNOME release.
+Pull requests are welcome, including unsolicited ones. You do not need prior
+approval to submit a bug fix or propose a feature through a pull request.
